@@ -11,7 +11,7 @@ test**: it proves the entry slices against bar volume, that the position is
 liquidated before the cutoff, and that the book ends flat. It is not evidence
 about returns - the official score comes from the organisers' engine over
 16 August - 15 September 2026, and the strategy's actual case is argued from
-real market history in ``research/field_study.py``.
+real market history in ``research/window_study.py``.
 
     python backtest.py                 # driftless smoke run
     python backtest.py --drift 0.5     # watch the winning branch execute

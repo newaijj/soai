@@ -11,14 +11,12 @@ liquidation on 15 September 2026. There is no Sharpe term, no drawdown
 penalty, no capital-preservation constraint, and no credit for the path. That
 makes it a rank tournament over a single ~30-day draw, and the object that
 maximises P(finishing first) in a rank tournament is not the object that
-maximises expected utility - it is the one with the fattest right tail that
-still clears the field's ceiling.
+maximises expected utility - it is the one with the fattest right tail.
 
-Every other public submission is capped well below what a 3x semiconductor
-position pays in an up tape (see README for the measured field study), so the
-whole design problem reduces to: hold the most volatile instrument the rules
-allow, for as long as the rules allow, and be certain of getting out at the
-end. Everything below is execution plumbing around that one decision.
+So the design reduces to: hold the most volatile instrument the rules allow,
+for as long as the rules allow, and be certain of getting out at the end.
+Everything below is execution plumbing around that one decision. The measured
+distribution of what a single window pays is in ``research/window_study.py``.
 
 Constraint compliance
 ---------------------

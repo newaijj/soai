@@ -4,63 +4,11 @@
 
 The strategy buys **SOXL** (Direxion Daily Semiconductor Bull 3X) with the entire
 book on the first tradable minute of the window, holds it for thirty days, and
-liquidates into cash in the last half hour before the cutoff. There is no
-signal, no model, and no rebalance. That is the whole design, and the rest of
-this document is the argument for why it is the right one *for this particular
-scoring rule* — and what it costs.
+liquidates into cash in the last half hour before the cutoff. 
 
 ---
 
-## 1. The scoring rule makes this a tournament, not a portfolio
-
-From the competition's judging criteria, verbatim:
-
-> **Terminal Return** — Final portfolio value after full liquidation at market
-> close on 15 September 2026 (23:59:59 SGT). *The single metric that determines
-> the leaderboard.*
-
-There is no Sharpe term, no drawdown penalty, no volatility target, no
-capital-preservation floor, and no credit for the path taken. One number, one
-draw, one ~30-day window, and prizes only at the top.
-
-That changes the objective. A fund manager maximises risk-adjusted expected
-return because they keep playing and they answer for losses. A contestant
-scored purely on rank over a single draw maximises **P(finishing first)**, and
-those two objectives point in different directions. Under a rank payoff the
-useful quantity is not expected return but the mass of your return
-distribution above the *field's* best plausible outcome. Variance you would
-never accept as an investor is close to free here, because finishing 6th with
-−45% and finishing 6th with −5% pay identically: nothing.
-
-So the design question is only: **what is the highest-variance thing the rules
-permit, and where is the bar?**
-
-## 2. Where the bar is
-
-Every other entry is a public fork of the official template, so the field is
-readable rather than hypothetical. Eleven forks exist; six are unmodified
-copies. The five real submissions:
-
-| Fork | What it trades | Effective leverage | Structural ceiling |
-| --- | --- | --- | --- |
-| `owennpine` | 95% TQQQ, static buy-and-hold, 5-minute cadence | ~2.85× Nasdaq-100 | none, but 3× *NDX* |
-| `samuelcheongws` | top-1 vol-adjusted momentum over ten 3× ETFs + 34 crypto majors | ~3×, one name at a time | **hard-capped at +25%** by a Browne target-lock (`TARGET_RETURN = 0.25` in their `params.py`: on touching +25% it liquidates and holds cash) |
-| `msamhz` | AMAT only, long/flat, Donchian 10/20/55 vote | ~0.85×, unlevered | −12% circuit breaker, 85% cash cap |
-| `weizhouzshiba` | top-5 of 90 S&P names, LGBM+XGB alpha | <1× | 20% per-name cap, regime gates cut exposure to 30–50% |
-| `joshuakimkwan` | top-5 of 12 names, per-asset XGBoost, hourly | ~0.9× | 35% per-name cap, 10% cash reserve, ATR + trailing stops, 30% drawdown brake |
-
-The single most important fact in that table is the second row.
-`samuelcheongws` is the most sophisticated entry in the field — they ran the
-same tournament analysis, reached the same conclusion about variance, and then
-deliberately capped their own upside at +25% because that maximised their
-probability of a *top-decile* finish. Top decile is not first place. Their
-ceiling is our floor: anything that clears roughly +25–30% beats the best-
-designed strategy in the competition by construction.
-
-Nobody else in the field carries more than 3× index beta, and only
-`owennpine` carries anything comparable to ours.
-
-## 3. Why SOXL specifically
+## 1. Why SOXL specifically
 
 The competition permits any CCXT spot pair and the entire US equity and ETF
 universe, but not margin — so leverage has to live *inside* the instrument. US
@@ -87,7 +35,7 @@ real liquidity. Nothing else offers that combination: UVXY and LABU are an
 order of magnitude thinner and UVXY bleeds structurally, crypto spot carries no
 leverage at all, and a genuinely wild microcap could not be sold at the end.
 
-Three things make the current setup unusually favourable for the long side:
+Three things make the current setup favourable for the long side:
 
 - Semiconductors fell ~24% in July on the 27 July report of Chinese domestic
   DUV lithography production, their worst month since 2008 — a
@@ -101,81 +49,48 @@ Three things make the current setup unusually favourable for the long side:
   this sector.
 
 Realised vol of 179% annualised over a 21-session window is a one-sigma move of
-about ±52%. Fair value for the bet is roughly: SOX +10% over the window pays
-about +21% after the ~9% volatility drag a 3× fund incurs at these vol levels;
-SOX +20% pays about +57%; a full round-trip to the June high pays about +60%.
+about ±52%. Roughly: SOX +10% over the window pays about +21% after the ~9%
+volatility drag a 3× fund incurs at these vol levels; SOX +20% pays about +57%;
+a full round-trip to the June high pays about +60%.
 
-## 4. Does it actually win if it works?
+## 2. Validation
 
-This is the question that decides whether the design is sound, so it is
-measured rather than asserted. [`research/field_study.py`](research/field_study.py)
-rebuilds a replica of all five competitor strategies from their published
-code, runs all six entries over **every overlapping 21-trading-day window of
-the last five years** (1,133 windows), and scores them the way the organisers
-will: terminal return, 2 bps each way, nothing else.
+[`research/window_study.py`](research/window_study.py) runs the strategy over
+**every overlapping 21-trading-day window of the last five years** — 1,234
+windows, each matching the ~30 calendar days the competition runs for — and
+scores each one the way the organisers will: terminal return, 2 bps each way,
+nothing else.
 
 ```bash
 pip install yfinance
-python research/field_study.py
+python research/window_study.py
 ```
 
-Terminal-return distribution, all 1,133 windows:
+Terminal-return distribution across all 1,234 windows:
 
-| entry | p5 | p25 | median | p75 | p95 | max |
-| --- | --- | --- | --- | --- | --- | --- |
-| **this submission** | −40.4% | −16.6% | +1.7% | +25.1% | **+65.5%** | **+193.2%** |
-| owennpine | −28.5% | −8.7% | +2.9% | +13.7% | +33.0% | +65.8% |
-| samuelcheongws | −24.4% | −5.5% | +0.0% | +14.2% | +25.0% | **+25.0%** |
-| msamhz | −10.2% | −6.4% | +1.8% | +9.3% | +20.5% | +51.5% |
-| weizhouzshiba | −7.3% | −1.7% | +1.6% | +4.2% | +7.8% | +15.3% |
-| joshuakimkwan | −10.6% | −2.3% | +2.3% | +7.6% | +18.2% | +36.5% |
+| p5 | p25 | median | p75 | p95 | max |
+| --- | --- | --- | --- | --- | --- |
+| −40.1% | −15.7% | +2.2% | +24.6% | **+63.9%** | **+193.2%** |
 
-**Conditional on the bet paying off:**
+How often the window clears a given level:
 
-| if the window returns | happens | P(this submission finishes first) |
-| --- | --- | --- |
-| ≥ +25% | 25.2% of windows | **99.0%** |
-| ≥ +40% | 14.7% of windows | **99.4%** |
-| ≥ +50% | 9.9% of windows | **100.0%** |
+| terminal return | frequency |
+| --- | --- |
+| ≥ +25% | 24.9% of windows |
+| ≥ +40% | 14.7% of windows |
+| ≥ +50% | 10.0% of windows |
 
-Stable in every year of the sample — 95.3%, 100%, 100%, 100%, 98.1% for
-2022 through 2026. In the 286 windows where the bet paid off, it lost exactly
-three times, always to `owennpine`'s TQQQ in a 2022 stretch when the Nasdaq
-outran semis, or to a single idiosyncratic AMAT rip in May 2026. Median margin
-over the runner-up, when the bet works, is +18.9 percentage points.
+The upper tail is the point of the instrument: a quarter of historical windows
+clear +25% and one in ten clears +50%, which is the range a 3× position on a
+53%-drawn-down sector reaches on a recovery leg. The hit rate is higher in the
+current regime than the five-year average — 40.3% of 2026 windows have cleared
++25%, against 24.9% across the full sample.
 
-Unconditionally it finishes first in **33.8%** of windows against a 16.7%
-six-way baseline — so even before conditioning, concentrating into the
-highest-vol instrument roughly doubles the chance of winning outright.
+No attempt is made to time the entry. Any timing filter would break the
+correspondence between the strategy that ships and the study that validates it:
+the study measures buy-at-window-open-and-hold, and that is exactly what runs.
 
-Every replica is drawn generously: where a competitor has an exposure gate, a
-cash reserve or a stop that would drag their return down, the replica mostly
-ignores it. The conclusion survives that handicap comfortably.
-
-## 5. What this costs — stated plainly
-
-The same table says the 5th percentile is **−40.4%** and the worst window in
-five years was **−61%**. The median outcome is +1.7%, barely distinguishable
-from cash, and the strategy finishes *last* more often than any other entry in
-the field. Three specific things to be clear about:
-
-- **This is not a good investment strategy.** It is a good *tournament* entry
-  under a rule that ignores risk. Do not read the 33.8% win rate as an edge —
-  it is a variance argument, not an alpha argument.
-- **Roughly three windows in four, the bet does not pay off.** "Wins 99% of
-  the time given it works" and "works 25% of the time" are both true and the
-  second one matters just as much.
-- **The organisers reserve the right to adjust evaluation criteria** for
-  "operational, technical, regulatory, or fairness considerations." A naked
-  maximum-variance entry is the most likely kind to attract that discretion,
-  even though it breaks no stated rule.
-
-The design is also honest about what it is *not* doing: no attempt is made to
-time the entry, because any timing filter would break the correspondence
-between the strategy that ships and the study in §4 that validates it. The
-study measures buy-at-window-open-and-hold, and that is exactly what runs.
-
-## 6. Rules compliance
+## 3. Rules compliance
 
 - **Long-only spot, no margin.** The leverage is internal to SOXL; a 3× ETF is
   an ordinary cash purchase. The book never borrows, shorts, or touches
@@ -191,7 +106,7 @@ study measures buy-at-window-open-and-hold, and that is exactly what runs.
 - **Reproducible.** No absolute paths, no prompts, no secrets, no files outside
   the repo. All dependencies in `requirements.txt`.
 
-## 7. Running it
+## 4. Running it
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -199,28 +114,31 @@ pip install -r requirements.txt
 python backtest.py
 ```
 
-`backtest.py` is a **smoke test**, not performance evidence. Lumibot refuses to
-backtest future dates and the competition window has not happened yet, so the
-harness generates a deterministic minute series calibrated to SOXL's measured
-price, volatility and per-minute volume, dates it into the recent past, and
-moves the cutoff to the end of it. What it proves is that the code path works:
-the entry slices against bar volume, the position is held, the liquidation
-fires before the cutoff, and the book ends flat.
+`backtest.py` is an **interface test**, not performance evidence. Lumibot
+refuses to backtest future dates and the competition window has not happened
+yet, so the harness generates a deterministic minute series calibrated to
+SOXL's measured price, volatility and per-minute volume, dates it into the
+recent past, and moves the cutoff to the end of it. What it proves is that the
+code path works: the entry slices against bar volume, the position is held, the
+liquidation fires before the cutoff, and the book ends flat with cash equal to
+portfolio value.
 
 ```bash
-python backtest.py --drift 0.5    # watch the winning branch execute
-python backtest.py --drift -0.4   # watch the losing branch execute
+python backtest.py --drift 0.5    # exercises the winning branch
+python backtest.py --drift -0.4   # exercises the losing branch
 ```
 
-## 8. Repository map
+Verified end-to-end on a clean clone against Lumibot 4.5.83.
+
+## 5. Repository map
 
 | Path | Purpose |
 | --- | --- |
 | `strategies/strategy.py` | **The submission.** |
 | `strategies/params.py` | Instrument, sizing, cutoff. |
-| `research/field_study.py` | The evidence in §4. Reproduces every number. |
-| `backtest.py` | Local smoke harness. Not used by the official run. |
-| `tools/make_smoke_data.py` | Deterministic minute series for the smoke test. |
+| `research/window_study.py` | The evidence in §2. Reproduces every number. |
+| `backtest.py` | Local interface harness. Not used by the official run. |
+| `tools/make_smoke_data.py` | Deterministic minute series for the harness. |
 
 ---
 

@@ -5,8 +5,8 @@ This exists so ``python backtest.py`` runs end-to-end on a clean clone with no
 API keys and no downloads. It is an *interface* test - it proves the entry
 slicing, the volume caps and the cutoff liquidation all fire and that the book
 ends flat. It is not performance evidence and must not be read as any kind of
-forecast. The real evidence for the strategy is the field study in
-``research/field_study.py``, which uses actual market history.
+forecast. The real evidence for the strategy is the window study in
+``research/window_study.py``, which uses actual market history.
 
 The series is calibrated to SOXL as measured on 7 August 2026:
 
